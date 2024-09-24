@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace MauiCrud.ViewModels
 {
@@ -83,8 +84,48 @@ namespace MauiCrud.ViewModels
 
             var busyText = OperatingProduct.Id == 0 ? "Creating product..." : "Updating product...";
             await ExecuteAsync(async () =>
-            { }, busyText);
+            {
+                if (OperatingProduct.Id == 0)
+                {
+                    await _context.AddItemAsync<Product>(OperatingProduct);
+                    Products.Add(OperatingProduct);
+                }
+                else
+                {
+                    if (await _context.UpdateItemAsync<Product>(OperatingProduct))
+                    {
+                        var productCopy = OperatingProduct.Clone();
 
+                        var index = Products.IndexOf(OperatingProduct);
+                        Products.RemoveAt(index);
+
+                        Products.Insert(index, productCopy);
+                    }
+                    else
+                    {
+                        await Shell.Current.DisplayAlert("Error", "Product updating error", "Ok");
+                        return;
+                    }
+                }
+                SetOperatingProductCommand.Execute(new());
+            }, busyText);
+        }
+
+        [RelayCommand]
+        private async Task DeleteProductAsync(int id)
+        {
+            await ExecuteAsync(async () =>
+            {
+                if (await _context.DeleteItemByKeyAsync<Product>(id))
+                {
+                    var product = Products.FirstOrDefault(p => p.Id == id);
+                    Products.Remove(product);
+                }
+                else
+                {
+                    await Shell.Current.DisplayAlert("Delete Error", "Product was not deleted", "Ok");
+                }
+            }, "Deleting product...");
         }
     }
 }
